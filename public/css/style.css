@@ -1,0 +1,1077 @@
+/* ============ Temel ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #181b24;
+  --surface-2: #1f2330;
+  --border: #2a2f3e;
+  --text: #e8eaf0;
+  --text-dim: #9aa0b0;
+  --accent: #7c6ff0;           /* Ayarlar pop-up'ından değiştirilebilir (theme.js) */
+  --accent-hover: color-mix(in srgb, var(--accent) 78%, #fff);
+  --accent-glow: color-mix(in srgb, var(--accent) 25%, transparent);
+  --modal-opacity: 0.58;       /* pop-up cam koyuluğu */
+  --modal-blur: 3px;           /* pop-up cam bulanıklığı */
+  --danger: #f06f6f;
+  --radius: 14px;
+  --c: #8a93a8; /* varsayılan tür rengi; .g-* sınıfları ezer */
+
+  /* @avenra/liquid-glass tema uyumu */
+  --lg-accent: var(--accent);
+  --lg-accent-2: var(--accent-hover);
+  --lg-tint: rgba(255, 255, 255, 0.04);
+  --lg-border: rgba(255, 255, 255, 0.16);
+}
+
+/* Liquid glass buton boyut uyarlamaları */
+#logout-btn.lg-button {
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.login-card #login-btn.lg-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 22px;
+  padding: 13px;
+  border-radius: 14px;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+.login-card #login-btn.lg-button:hover { background: none; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+
+/* ============ Login ============ */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.login-bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.orb-1 { width: 480px; height: 480px; background: var(--accent); top: -120px; left: -120px; }
+.orb-2 { width: 420px; height: 420px; background: #2f6ff0; bottom: -140px; right: -100px; }
+
+.login-card {
+  width: min(400px, 92vw);
+  background: rgba(24, 27, 36, 0.75);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 44px 38px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: rise 0.5s ease both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.login-logo { font-size: 44px; text-align: center; margin-bottom: 8px; }
+.login-card h1 { text-align: center; font-size: 26px; letter-spacing: 0.5px; }
+.login-subtitle { text-align: center; color: var(--text-dim); font-size: 14px; margin: 6px 0 28px; }
+
+.login-card label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 16px 0 6px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-card input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 14px;
+  text-align: center;
+}
+
+.login-card button {
+  width: 100%;
+  margin-top: 22px;
+  padding: 13px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.1s;
+}
+.login-card button:hover { background: var(--accent-hover); }
+.login-card button:active { transform: scale(0.98); }
+.login-card button:disabled { opacity: 0.6; cursor: wait; }
+
+/* ============ Üst bar ============ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(15, 17, 23, 0.85);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand { font-size: 19px; font-weight: 700; white-space: nowrap; }
+.brand span { background: linear-gradient(90deg, #a99ef7, #6fb2f0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.search-wrap {
+  flex: 1;
+  max-width: 460px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 16px;
+  transition: border-color 0.2s;
+}
+.search-wrap:focus-within { border-color: var(--accent); }
+.search-wrap svg { width: 17px; height: 17px; color: var(--text-dim); flex-shrink: 0; }
+.search-wrap input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+}
+.search-wrap input:focus { outline: none; }
+
+/* ============ Dil değiştirici (liquid glass) ============ */
+@property --ring-ang {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.lang-switch {
+  position: relative;
+  margin-left: auto;
+  display: flex;
+  width: 96px;
+  height: 34px;
+  padding: 3px;
+  border-radius: 999px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(10px) saturate(1.4);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+}
+.lang-switch:hover {
+  transform: scale(1.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 22px rgba(0, 0, 0, 0.35);
+}
+
+/* Hover'da dönen renkli ışık halesi */
+.lang-switch::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: 999px;
+  background: conic-gradient(from var(--ring-ang),
+    #7c6ff0, #4da3f0, #6cc968, #e8c05a, #ee85bb, #7c6ff0);
+  filter: blur(7px);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.lang-switch:hover::before {
+  opacity: 0.85;
+  animation: ring-spin 2.2s linear infinite;
+}
+@keyframes ring-spin {
+  to { --ring-ang: 360deg; }
+}
+
+/* Cam üzerinde kayan ışık süpürmesi */
+.lang-switch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.28) 50%, transparent 75%);
+  background-size: 250% 100%;
+  background-position: 180% 0;
+  opacity: 0;
+}
+.lang-switch:hover::after {
+  opacity: 1;
+  animation: shine-sweep 1.5s ease-in-out infinite;
+}
+@keyframes shine-sweep {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+.lang-switch.dragging { cursor: grabbing; }
+
+.lang-opt {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  transition: color 0.25s;
+  pointer-events: none;
+}
+.lang-opt.active { color: #fff; }
+
+/* Sürüklenen cam topuz */
+.lang-knob {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.lang-switch[data-lang="en"] .lang-knob { transform: translateX(100%); }
+
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.btn-ghost:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ============ Filtreler ============ */
+.container { max-width: 1280px; margin: 0 auto; padding: 26px 24px 60px; }
+
+.filters { margin-bottom: 26px; }
+
+.genre-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  transition: all 0.18s;
+}
+.chip:hover { border-color: var(--accent); color: var(--text); }
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+
+.filter-group { display: flex; align-items: center; gap: 8px; }
+.filter-group label { font-size: 13px; color: var(--text-dim); }
+.dash { color: var(--text-dim); }
+
+.year-input {
+  width: 92px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+.year-input:focus { outline: none; border-color: var(--accent); }
+
+#sort {
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+#sort:focus { outline: none; border-color: var(--accent); }
+
+.result-count { margin-left: auto; font-size: 13.5px; color: var(--text-dim); }
+
+/* ============ Kitap kartları ============ */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 18px;
+}
+
+.book-card {
+  position: relative;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
+  animation: rise 0.35s ease both;
+}
+.book-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--c);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s ease;
+  z-index: 1;
+}
+.book-card:hover::before { transform: scaleX(1); }
+.book-card:hover {
+  transform: translateY(-5px);
+  border-color: color-mix(in srgb, var(--c) 40%, var(--border));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.book-cover {
+  height: 118px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(110px 80px at 50% 45%, color-mix(in srgb, var(--c) 30%, transparent), transparent 75%),
+    linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent), color-mix(in srgb, var(--c) 5%, transparent));
+}
+
+.cover-icon {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 19px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c) 38%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 22%, transparent);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cover-icon svg { width: 30px; height: 30px; }
+.book-card:hover .cover-icon { transform: scale(1.12) rotate(-5deg); }
+
+.book-info { padding: 14px 16px 16px; }
+.book-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.book-author { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+
+.book-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  flex-wrap: wrap;
+}
+
+.genre-badge {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: color-mix(in srgb, var(--c) 78%, #fff);
+  font-weight: 600;
+}
+
+.book-year, .book-rating { font-size: 12.5px; color: var(--text-dim); }
+.book-rating { margin-left: auto; color: #f0c86f; font-weight: 600; }
+
+.book-desc {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 16px;
+  padding: 70px 0;
+}
+
+/* ============ Tür renkleri ============ */
+.g-roman           { --c: #8b7cf7; }
+.g-bilim-kurgu     { --c: #4da3f0; }
+.g-fantastik       { --c: #b06ce8; }
+.g-polisiye        { --c: #f0708c; }
+.g-tarih           { --c: #e09a5c; }
+.g-felsefe         { --c: #4cc2a0; }
+.g-siir            { --c: #ee85bb; }
+.g-macera          { --c: #6cc968; }
+.g-kisisel-gelisim { --c: #e8c05a; }
+
+/* ============ Liquid glass modal ============ */
+.modal-overlay[hidden] { display: none; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 10, 16, 0.35);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.modal-overlay.open { opacity: 1; }
+
+/* Kart: katmanları taşıyan kabuk — camın kendisi alttaki katmanlar */
+.modal {
+  position: relative;
+  width: min(540px, 100%);
+  max-height: calc(100vh - 40px);
+  border-radius: 28px;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transform: translateY(36px) scale(0.92);
+  transition:
+    transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.35s ease;
+  will-change: transform, opacity;
+}
+.modal-overlay.open .modal { opacity: 1; transform: none; }
+
+/* Katman 1a — düz cam: tüm yüzeyde hafif bulanıklık (ayarlanabilir) */
+.glass-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  backdrop-filter: blur(var(--modal-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(1.5);
+}
+
+/* Katman 1b — kırılma: yalnızca kenarlarda, maske ile merkez temiz bırakılır */
+.glass-effect {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  backdrop-filter: blur(var(--modal-blur));
+  -webkit-backdrop-filter: blur(var(--modal-blur));
+  filter: url(#glass-distortion);
+  -webkit-mask-image: radial-gradient(130% 130% at 50% 50%, transparent 46%, black 72%);
+  mask-image: radial-gradient(130% 130% at 50% 50%, transparent 46%, black 72%);
+}
+
+/* Katman 2 — renk tonu: tür rengine göre hafif boyama (opaklık ayarlanabilir) */
+.glass-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--c) 10%, rgba(15, 18, 26, var(--modal-opacity)));
+}
+
+/* Katman 3 — kenar parlaması: camın kalınlık hissi */
+.glass-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 28px;
+  pointer-events: none;
+  box-shadow:
+    inset 2px 2px 1px 0 rgba(255, 255, 255, 0.25),
+    inset -1px -1px 1px 1px rgba(255, 255, 255, 0.10);
+}
+
+/* İçerik katmanı — kaydırma burada olur, cam katmanları sabit kalır */
+.glass-content {
+  position: relative;
+  z-index: 3;
+  padding: 30px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.modal-close {
+  position: absolute;
+  z-index: 4;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+.modal-close:hover { background: rgba(255, 255, 255, 0.16); color: var(--text); transform: rotate(90deg); }
+.modal-close svg { width: 15px; height: 15px; }
+
+.modal-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding-right: 40px;
+}
+
+.modal-icon {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: var(--c);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)),
+    color-mix(in srgb, var(--c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, rgba(255, 255, 255, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.modal-icon svg { width: 34px; height: 34px; }
+
+.modal-title { font-size: 22px; font-weight: 700; line-height: 1.25; }
+.modal-author { color: var(--text-dim); font-size: 14.5px; margin-top: 4px; }
+
+.modal-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+
+.m-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.m-chip.genre {
+  color: color-mix(in srgb, var(--c) 80%, #fff);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--c) 30%, transparent);
+}
+.m-chip.rating { color: #f0c86f; }
+
+.modal-sub {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--c) 75%, #fff);
+  margin-bottom: 8px;
+}
+
+.modal-summary {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text);
+  opacity: 0.92;
+}
+
+/* ============ Kayıt/giriş geçişi ============ */
+.login-toggle {
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  margin-top: 20px;
+}
+.login-toggle a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-toggle a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+/* ============ Kullanıcı çipi + kitap ekle butonu ============ */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.user-chip svg { width: 14px; height: 14px; }
+
+.btn-add {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-add:hover { background: var(--accent-hover); }
+.btn-add:active { transform: scale(0.97); }
+
+/* ============ Raf filtreleri ============ */
+.shelf-chips { margin-bottom: 18px; }
+.shelf-chips .chip.active {
+  background: #b8608a;
+  border-color: #b8608a;
+}
+
+/* ============ Kart üzerindeki favori kalbi + durum rozeti ============ */
+.fav-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(15, 17, 23, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+  transition: color 0.2s, transform 0.15s, border-color 0.2s;
+}
+.fav-btn svg { width: 15px; height: 15px; fill: none; }
+.fav-btn:hover { color: #f06f9c; transform: scale(1.12); }
+.fav-btn.active { color: #f06f9c; border-color: rgba(240, 111, 156, 0.5); }
+.fav-btn.active svg { fill: currentColor; }
+
+.status-badge {
+  position: absolute;
+  top: 12px;
+  left: 10px;
+  z-index: 2;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+}
+.status-badge.s-read {
+  background: rgba(76, 194, 160, 0.2);
+  color: #6fd9b9;
+  border: 1px solid rgba(76, 194, 160, 0.4);
+}
+.status-badge.s-toread {
+  background: rgba(224, 154, 92, 0.2);
+  color: #eab383;
+  border: 1px solid rgba(224, 154, 92, 0.4);
+}
+
+.book-cover { position: relative; }
+
+/* ============ Modal raf aksiyonları ============ */
+.modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+
+.m-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 15px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.18s;
+}
+.m-action svg { width: 14px; height: 14px; fill: none; }
+.m-action:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.3); }
+.m-action.active {
+  color: #fff;
+  background: color-mix(in srgb, var(--c) 40%, transparent);
+  border-color: color-mix(in srgb, var(--c) 60%, transparent);
+}
+.m-action.fav.active {
+  background: rgba(240, 111, 156, 0.3);
+  border-color: rgba(240, 111, 156, 0.55);
+}
+.m-action.fav.active svg { fill: currentColor; }
+
+/* ============ Modal admin butonları ============ */
+.modal-admin {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.m-admin-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: all 0.18s;
+}
+.m-admin-btn:hover { background: rgba(255, 255, 255, 0.15); }
+.m-admin-btn.danger { color: #f29090; }
+.m-admin-btn.danger:hover {
+  background: rgba(240, 111, 111, 0.18);
+  border-color: rgba(240, 111, 111, 0.45);
+}
+
+/* ============ Kitap ekleme/düzenleme formu ============ */
+.form-title { margin-bottom: 20px; padding-right: 40px; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px 14px;
+}
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field.span-2 { grid-column: 1 / -1; }
+
+.form-field label { font-size: 12.5px; color: var(--text-dim); font-weight: 600; }
+
+.form-field input,
+.form-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(15, 17, 23, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-field input:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.form-error { color: var(--danger); font-size: 13px; margin-top: 12px; }
+
+.form-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+.btn-cancel,
+.btn-save {
+  flex: 1;
+  padding: 11px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.18s;
+}
+.btn-cancel {
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.btn-cancel:hover { color: var(--text); background: rgba(255, 255, 255, 0.12); }
+.btn-save {
+  color: #fff;
+  background: var(--accent);
+  border: none;
+}
+.btn-save:hover { background: var(--accent-hover); }
+
+/* ============ Ödünç ============ */
+.btn-loans {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.btn-loans:hover { color: var(--text); border-color: var(--accent); }
+
+.borrow-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 2;
+  font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(124, 111, 240, 0.22);
+  border: 1px solid rgba(124, 111, 240, 0.45);
+  backdrop-filter: blur(6px);
+}
+.borrow-badge.overdue {
+  background: rgba(240, 111, 111, 0.25);
+  border-color: rgba(240, 111, 111, 0.55);
+}
+
+.m-action.borrow.active {
+  background: rgba(124, 111, 240, 0.32);
+  border-color: rgba(124, 111, 240, 0.6);
+  color: #fff;
+}
+.m-action.borrow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.m-chip.loan { color: #a99ef7; }
+.m-chip.loan.overdue, .m-chip.out { color: #f29090; }
+
+.loans-list { display: flex; flex-direction: column; gap: 10px; }
+
+.loan-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+.loan-item.overdue { border-color: rgba(240, 111, 111, 0.45); }
+
+.loan-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.loan-user { font-weight: 700; font-size: 14px; }
+.loan-book { font-size: 13.5px; color: var(--text-dim); }
+.loan-dates { font-size: 12px; color: var(--text-dim); }
+.loan-item.overdue .loan-dates { color: #f29090; }
+.loan-item .m-admin-btn { flex: 0 0 auto; padding: 8px 14px; }
+
+/* ============ Değerlendirmeler ============ */
+.review-heading { margin-top: 24px; }
+
+.review-editor {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  margin-bottom: 14px;
+}
+
+.review-editor-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.star-picker { display: flex; gap: 4px; margin-bottom: 10px; }
+.star-picker .star {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.22);
+  padding: 2px;
+  transition: color 0.15s, transform 0.15s;
+}
+.star-picker .star:hover { transform: scale(1.2); }
+.star-picker .star.on { color: #f0c86f; }
+
+.review-comment {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(15, 17, 23, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+.review-comment:focus { outline: none; border-color: var(--accent); }
+
+.review-editor-actions { display: flex; gap: 10px; margin-top: 10px; }
+.review-editor-actions .m-admin-btn { flex: 0 0 auto; padding: 8px 18px; font-size: 12.5px; }
+
+.review-list { display: flex; flex-direction: column; gap: 10px; }
+
+.review-item {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.review-item.mine { border-color: color-mix(in srgb, var(--c) 40%, transparent); }
+
+.review-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.review-user { font-weight: 700; font-size: 13px; }
+.review-stars { color: #f0c86f; font-size: 12.5px; letter-spacing: 1px; }
+.review-date { font-size: 11.5px; color: var(--text-dim); margin-left: auto; }
+
+.review-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.review-remove:hover { color: #f29090; background: rgba(240, 111, 111, 0.12); }
+
+.review-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  opacity: 0.9;
+  margin-top: 6px;
+}
+
+.review-empty { font-size: 13px; color: var(--text-dim); padding: 6px 2px; }
+
+.book-rating small { font-size: 10.5px; font-weight: 400; color: var(--text-dim); }
+
+/* ============ Ayarlar ============ */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  transition: color 0.2s, border-color 0.2s, transform 0.4s ease;
+}
+.icon-btn svg { width: 17px; height: 17px; }
+.icon-btn:hover { color: var(--text); border-color: var(--accent); transform: rotate(60deg); }
+
+.settings-group { margin-bottom: 22px; }
+
+.settings-group > label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+.setting-val { color: var(--text); font-weight: 600; }
+
+.swatch-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sw);
+  border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.swatch:hover { transform: scale(1.15); }
+.swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw) 45%, transparent);
+}
+
+#custom-color {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+#custom-color:hover { border-color: #fff; transform: scale(1.1); }
+#custom-color::-webkit-color-swatch-wrapper { padding: 3px; }
+#custom-color::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+.settings-group input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .topbar-inner { flex-wrap: wrap; }
+  .search-wrap { order: 3; max-width: none; width: 100%; }
+  .result-count { margin-left: 0; width: 100%; }
+  .user-chip { display: none; }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+}

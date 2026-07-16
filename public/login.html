@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Giriş — Kütüphane</title>
+  <link rel="stylesheet" href="/vendor/liquid-glass/styles/liquid-glass.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="login-page">
+  <div class="login-bg-orb orb-1"></div>
+  <div class="login-bg-orb orb-2"></div>
+
+  <main class="login-card">
+    <div class="login-logo">📚</div>
+    <h1>Kütüphane</h1>
+    <p class="login-subtitle" id="login-subtitle">Devam etmek için giriş yapın</p>
+
+    <form id="login-form" autocomplete="off">
+      <label for="username">Kullanıcı Adı</label>
+      <input type="text" id="username" name="username" placeholder="Kullanıcı adınız" required>
+
+      <label for="password">Şifre</label>
+      <input type="password" id="password" name="password" placeholder="••••••••" required>
+
+      <p id="login-error" class="login-error" hidden></p>
+
+      <button type="submit" id="login-btn">Giriş Yap</button>
+    </form>
+
+    <p class="login-toggle">
+      <span id="toggle-text">Hesabınız yok mu?</span>
+      <a href="#" id="mode-toggle">Kayıt olun</a>
+    </p>
+  </main>
+
+  <script src="/js/theme.js"></script>
+  <script src="/vendor/liquid-glass/dist/liquid-glass.umd.min.js"></script>
+  <script src="/js/login.js"></script>
+</body>
+</html>
