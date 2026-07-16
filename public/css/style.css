@@ -897,6 +897,25 @@ input, select { font-family: inherit; }
 
 .m-chip.loan { color: #a99ef7; }
 .m-chip.loan.overdue, .m-chip.out { color: #f29090; }
+.m-chip.ready { color: #7fd6a8; }
+
+/* ============ Teslim / rezervasyon uyarı şeridi ============ */
+.due-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(6px);
+  animation: rise 0.4s ease both;
+}
+.due-line { font-size: 14px; font-weight: 600; }
+.due-line.overdue { color: #f29090; }
+.due-line.soon { color: #eec97a; }
+.due-line.ready { color: #7fd6a8; }
 
 .loans-list { display: flex; flex-direction: column; gap: 10px; }
 

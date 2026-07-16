@@ -1,7 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'library.db'));
+// DB_PATH testlerde geçici bir veritabanına yönlendirmek için kullanılır
+const db = new Database(process.env.DB_PATH || path.join(__dirname, 'library.db'));
 db.pragma('foreign_keys = ON');
 
 db.exec(`
@@ -48,6 +49,14 @@ db.exec(`
     borrowed_at TEXT NOT NULL DEFAULT (datetime('now')),
     due_at TEXT NOT NULL,
     returned_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'fulfilled', 'cancelled'))
   );
 `);
 

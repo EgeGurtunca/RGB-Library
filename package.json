@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test \"tests/**/*.test.js\"",
     "start": "node server.js",
     "covers": "node scripts/fetch-covers.js"
   },
@@ -16,9 +16,13 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
-    "express-session": "^1.19.0"
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const helmet = require('helmet');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
@@ -25,12 +26,23 @@ const seedAdmin = () => {
 };
 seedAdmin();
 
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      // Kitap kapakları dış kaynaklardan (Open Library vb.) geliyor
+      'img-src': ["'self'", 'https:', 'data:'],
+      // Yerelde http üzerinden çalışabilmek için (canlıda ters proxy https sağlar)
+      'upgrade-insecure-requests': null,
+    },
+  },
+}));
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 8 } // 8 saat
+  cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 8 } // 8 saat
 }));
 
 const requireAuth = (req, res, next) => {
@@ -65,6 +77,7 @@ const authLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Çok fazla deneme yaptınız. Lütfen 10 dakika sonra tekrar deneyin.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 app.post('/api/register', authLimiter, (req, res) => {
@@ -157,8 +170,8 @@ app.get('/api/books', requireAuth, (req, res) => {
   const { search, genre, yearMin, yearMax, sort, shelf } = req.query;
   const userId = req.session.user.id;
   const conditions = [];
-  // Sıra önemli: SQL'deki ilk iki ? my_due alt sorgusu ve user_books join'i
-  const params = [userId, userId];
+  // Sıra önemli: SQL'deki ilk üç ? my_due, my_queue_pos ve user_books join'i
+  const params = [userId, userId, userId];
 
   if (search) {
     conditions.push('(title LIKE ? OR author LIKE ? OR title_en LIKE ?)');
@@ -201,12 +214,69 @@ app.get('/api/books', requireAuth, (req, res) => {
       (SELECT COUNT(*) FROM reviews r WHERE r.book_id = b.id) AS review_count,
       COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.book_id = b.id), b.rating) AS avg_rating,
       b.copies - (SELECT COUNT(*) FROM loans l WHERE l.book_id = b.id AND l.returned_at IS NULL) AS available,
-      (SELECT l.due_at FROM loans l WHERE l.book_id = b.id AND l.user_id = ? AND l.returned_at IS NULL) AS my_due
+      (SELECT l.due_at FROM loans l WHERE l.book_id = b.id AND l.user_id = ? AND l.returned_at IS NULL) AS my_due,
+      (SELECT COUNT(*) FROM reservations rs WHERE rs.book_id = b.id AND rs.status = 'active') AS reservation_count,
+      (SELECT COUNT(*) FROM reservations r2 WHERE r2.book_id = b.id AND r2.status = 'active'
+        AND r2.id <= (SELECT r3.id FROM reservations r3 WHERE r3.book_id = b.id AND r3.user_id = ? AND r3.status = 'active')
+      ) AS my_queue_pos
     FROM books b
     LEFT JOIN user_books ub ON ub.book_id = b.id AND ub.user_id = ?
     ${where} ORDER BY ${orderBy}
   `).all(...params);
   res.json({ count: books.length, books });
+});
+
+// Kişiye özel öneriler: kullanıcının etkileşime girdiği kitaplarla (raf, yorum,
+// ödünç, rezervasyon) yazar/tür benzerliği + okur puanı skoru. Etkileşim yoksa
+// skor yalnızca puana düşer, yani en beğenilen kitaplar önerilir.
+app.get('/api/recommendations', requireAuth, (req, res) => {
+  const books = db.prepare(`
+    WITH my_books AS (
+      SELECT book_id FROM user_books WHERE user_id = @id
+      UNION SELECT book_id FROM reviews WHERE user_id = @id
+      UNION SELECT book_id FROM loans WHERE user_id = @id
+      UNION SELECT book_id FROM reservations WHERE user_id = @id AND status = 'active'
+    )
+    SELECT b.*,
+      0 AS favorite, NULL AS status, NULL AS my_due, 0 AS my_queue_pos,
+      (SELECT COUNT(*) FROM reviews r WHERE r.book_id = b.id) AS review_count,
+      COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.book_id = b.id), b.rating) AS avg_rating,
+      b.copies - (SELECT COUNT(*) FROM loans l WHERE l.book_id = b.id AND l.returned_at IS NULL) AS available,
+      (SELECT COUNT(*) FROM reservations rs WHERE rs.book_id = b.id AND rs.status = 'active') AS reservation_count,
+      ((SELECT COUNT(*) FROM my_books m JOIN books mb ON mb.id = m.book_id AND mb.author = b.author) * 3.0
+        + (SELECT COUNT(*) FROM my_books m JOIN books mb ON mb.id = m.book_id AND mb.genre = b.genre) * 0.5
+        + COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.book_id = b.id), b.rating)) AS rec_score
+    FROM books b
+    WHERE b.id NOT IN (SELECT book_id FROM my_books)
+    ORDER BY rec_score DESC, b.title COLLATE NOCASE
+    LIMIT 12
+  `).all({ id: req.session.user.id });
+  res.json({ count: books.length, books });
+});
+
+// Kullanıcı uyarıları: gecikmiş / yaklaşan iadeler ve sırası gelen rezervasyonlar
+app.get('/api/my/alerts', requireAuth, (req, res) => {
+  const userId = req.session.user.id;
+  const loans = db.prepare(`
+    SELECT b.title, b.title_en, l.due_at,
+      CAST(julianday(l.due_at) - julianday('now') AS INTEGER) AS days_left
+    FROM loans l JOIN books b ON b.id = l.book_id
+    WHERE l.user_id = ? AND l.returned_at IS NULL
+    ORDER BY l.due_at
+  `).all(userId);
+  const ready = db.prepare(`
+    SELECT b.title, b.title_en
+    FROM reservations rs JOIN books b ON b.id = rs.book_id
+    WHERE rs.user_id = ? AND rs.status = 'active'
+      AND (SELECT COUNT(*) FROM reservations r2 WHERE r2.book_id = rs.book_id AND r2.status = 'active' AND r2.id <= rs.id)
+        <= b.copies - (SELECT COUNT(*) FROM loans l WHERE l.book_id = rs.book_id AND l.returned_at IS NULL)
+    ORDER BY rs.id
+  `).all(userId);
+  res.json({
+    overdue: loans.filter((l) => l.days_left < 0),
+    dueSoon: loans.filter((l) => l.days_left >= 0 && l.days_left <= 3),
+    ready,
+  });
 });
 
 const parseBook = (body) => {
@@ -375,6 +445,20 @@ app.post('/api/books/:id/borrow', requireAuth, (req, res) => {
     }
     const active = db.prepare('SELECT COUNT(*) AS c FROM loans WHERE book_id = ? AND returned_at IS NULL').get(bookId).c;
     if (active >= book.copies) return { code: 409, error: 'Bu kitabın tüm kopyaları ödünçte.' };
+
+    // Müsait kopyalar önce rezervasyon sırasındakilere ayrılır (id = kuyruk sırası)
+    const availableCopies = book.copies - active;
+    const queue = db.prepare(`SELECT id, user_id FROM reservations WHERE book_id = ? AND status = 'active' ORDER BY id`).all(bookId);
+    const myPos = queue.findIndex((r) => r.user_id === userId);
+    if (myPos >= 0) {
+      if (myPos >= availableCopies) {
+        return { code: 409, error: `Rezervasyon sıranız henüz gelmedi (sıranız: ${myPos + 1}).` };
+      }
+      db.prepare(`UPDATE reservations SET status = 'fulfilled' WHERE id = ?`).run(queue[myPos].id);
+    } else if (availableCopies <= queue.length) {
+      return { code: 409, error: 'Müsait kopyalar rezervasyon sırasındaki üyeler için ayrıldı.' };
+    }
+
     db.prepare(`INSERT INTO loans (user_id, book_id, due_at) VALUES (?, ?, datetime('now', '+${LOAN_DAYS} days'))`)
       .run(userId, bookId);
     const due = db.prepare('SELECT due_at FROM loans WHERE user_id = ? AND book_id = ? AND returned_at IS NULL')
@@ -383,6 +467,38 @@ app.post('/api/books/:id/borrow', requireAuth, (req, res) => {
   })();
   if (result.error) return res.status(result.code).json({ error: result.error });
   res.json(result.body);
+});
+
+// --- Rezervasyon ---
+app.post('/api/books/:id/reserve', requireAuth, (req, res) => {
+  const bookId = Number(req.params.id);
+  const userId = req.session.user.id;
+  const result = db.transaction(() => {
+    const book = db.prepare('SELECT id, copies FROM books WHERE id = ?').get(bookId);
+    if (!book) return { code: 404, error: 'Kitap bulunamadı.' };
+    if (db.prepare('SELECT 1 FROM loans WHERE user_id = ? AND book_id = ? AND returned_at IS NULL').get(userId, bookId)) {
+      return { code: 409, error: 'Bu kitap zaten sizde, rezervasyona gerek yok.' };
+    }
+    if (db.prepare(`SELECT 1 FROM reservations WHERE user_id = ? AND book_id = ? AND status = 'active'`).get(userId, bookId)) {
+      return { code: 409, error: 'Bu kitap için zaten rezervasyonunuz var.' };
+    }
+    const active = db.prepare('SELECT COUNT(*) AS c FROM loans WHERE book_id = ? AND returned_at IS NULL').get(bookId).c;
+    const reserved = db.prepare(`SELECT COUNT(*) AS c FROM reservations WHERE book_id = ? AND status = 'active'`).get(bookId).c;
+    if (book.copies - active - reserved > 0) {
+      return { code: 409, error: 'Kitap şu an müsait — doğrudan ödünç alabilirsiniz.' };
+    }
+    db.prepare('INSERT INTO reservations (user_id, book_id) VALUES (?, ?)').run(userId, bookId);
+    return { code: 201, body: { position: reserved + 1 } };
+  })();
+  if (result.error) return res.status(result.code).json({ error: result.error });
+  res.status(result.code).json(result.body);
+});
+
+app.delete('/api/books/:id/reserve', requireAuth, (req, res) => {
+  const info = db.prepare(`UPDATE reservations SET status = 'cancelled' WHERE user_id = ? AND book_id = ? AND status = 'active'`)
+    .run(req.session.user.id, Number(req.params.id));
+  if (info.changes === 0) return res.status(404).json({ error: 'Aktif rezervasyon bulunamadı.' });
+  res.json({ ok: true });
 });
 
 app.post('/api/books/:id/return', requireAuth, (req, res) => {
@@ -452,6 +568,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Sunucu hatası.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Kütüphane sunucusu çalışıyor: http://localhost:${PORT}`);
-});
+// Testler app'i supertest ile kullanır; dinleme yalnızca doğrudan çalıştırınca
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Kütüphane sunucusu çalışıyor: http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

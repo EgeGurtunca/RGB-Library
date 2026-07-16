@@ -40,7 +40,7 @@ const I18N = {
     pages: 'sayfa',
     summary: 'Özet',
     brand: 'Kütüphane',
-    shelfLabels: { '': 'Tüm Kitaplar', 'favorites': '♥ Favorilerim', 'toread': 'Okuyacaklarım', 'read': 'Okuduklarım', 'borrowed': 'Ödünç Aldıklarım' },
+    shelfLabels: { '': 'Tüm Kitaplar', 'favorites': '♥ Favorilerim', 'toread': 'Okuyacaklarım', 'read': 'Okuduklarım', 'borrowed': 'Ödünç Aldıklarım', 'recommended': '✨ Sana Özel' },
     addBook: '+ Kitap Ekle',
     actFav: 'Favori',
     actToread: 'Okuyacağım',
@@ -106,6 +106,15 @@ const I18N = {
     noMyLoans: 'Henüz kitap ödünç almadın.',
     returnedAt: 'İade edildi',
     stillOut: 'Sende',
+    reserve: 'Rezerve Et',
+    cancelReserve: 'Rezervasyonu İptal Et',
+    queuePos: (n) => `Rezervasyon sıran: ${n}.`,
+    heldForQueue: 'Kopyalar rezervasyon sırasındakilere ayrıldı',
+    reservationReady: 'Rezervasyonun hazır — şimdi ödünç alabilirsin!',
+    bOverdue: (title) => `${title} — iade tarihi geçti!`,
+    bDueToday: (title) => `${title} — iade günü bugün!`,
+    bDueSoon: (title, n) => `${title} — iadeye ${n} gün kaldı`,
+    bReady: (title) => `${title} — rezervasyonun hazır, şimdi ödünç alabilirsin`,
   settings: 'Ayarlar',
     accentColor: 'Site Rengi',
     customColor: 'Özel renk seç',
@@ -127,7 +136,7 @@ const I18N = {
     pages: 'pages',
     summary: 'Summary',
     brand: 'Library',
-    shelfLabels: { '': 'All Books', 'favorites': '♥ My Favorites', 'toread': 'To Read', 'read': 'Finished', 'borrowed': 'My Loans' },
+    shelfLabels: { '': 'All Books', 'favorites': '♥ My Favorites', 'toread': 'To Read', 'read': 'Finished', 'borrowed': 'My Loans', 'recommended': '✨ For You' },
     addBook: '+ Add Book',
     actFav: 'Favorite',
     actToread: 'To Read',
@@ -193,6 +202,15 @@ const I18N = {
     noMyLoans: "You haven't borrowed any books yet.",
     returnedAt: 'Returned',
     stillOut: 'Checked out',
+    reserve: 'Reserve',
+    cancelReserve: 'Cancel Reservation',
+    queuePos: (n) => `Your place in the queue: #${n}`,
+    heldForQueue: 'Copies are held for the reservation queue',
+    reservationReady: 'Your reservation is ready — borrow it now!',
+    bOverdue: (title) => `${title} — overdue!`,
+    bDueToday: (title) => `${title} — due today!`,
+    bDueSoon: (title, n) => `${title} — due in ${n} ${n === 1 ? 'day' : 'days'}`,
+    bReady: (title) => `${title} — your reservation is ready, borrow it now`,
   settings: 'Settings',
     accentColor: 'Site Color',
     customColor: 'Pick a custom color',
@@ -286,6 +304,30 @@ const fmtDate = (sqlDate) => new Date(sqlDate.replace(' ', 'T') + 'Z')
 const isOverdue = (sqlDate) => new Date(sqlDate.replace(' ', 'T') + 'Z') < new Date();
 const starRow = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
+// ============ Teslim / rezervasyon uyarı şeridi ============
+const dueBanner = document.getElementById('due-banner');
+let lastAlerts = null;
+
+function renderAlerts() {
+  if (!lastAlerts) return;
+  const L = t();
+  const title = (r) => (lang === 'en' && r.title_en ? r.title_en : r.title);
+  const lines = [
+    ...lastAlerts.overdue.map((l) => `<div class="due-line overdue">⚠ ${escapeHtml(L.bOverdue(title(l)))}</div>`),
+    ...lastAlerts.dueSoon.map((l) => `<div class="due-line soon">⏳ ${escapeHtml(l.days_left === 0 ? L.bDueToday(title(l)) : L.bDueSoon(title(l), l.days_left))}</div>`),
+    ...lastAlerts.ready.map((r) => `<div class="due-line ready">🔔 ${escapeHtml(L.bReady(title(r)))}</div>`),
+  ];
+  dueBanner.innerHTML = lines.join('');
+  dueBanner.hidden = lines.length === 0;
+}
+
+async function loadAlerts() {
+  const res = await fetch('/api/my/alerts');
+  if (!res.ok) return;
+  lastAlerts = await res.json();
+  renderAlerts();
+}
+
 // ============ Oturumdaki kullanıcı ============
 async function loadMe() {
   const res = await fetch('/api/me');
@@ -315,15 +357,22 @@ async function setShelf(book, patch) {
 }
 
 async function loadBooks() {
-  const params = new URLSearchParams();
-  if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
-  if (activeGenre) params.set('genre', activeGenre);
-  if (activeShelf) params.set('shelf', activeShelf);
-  if (yearMinInput.value) params.set('yearMin', yearMinInput.value);
-  if (yearMaxInput.value) params.set('yearMax', yearMaxInput.value);
-  params.set('sort', sortSelect.value);
+  let url;
+  if (activeShelf === 'recommended') {
+    // Öneriler kendi skoruna göre sıralanır; diğer filtreler uygulanmaz
+    url = '/api/recommendations';
+  } else {
+    const params = new URLSearchParams();
+    if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+    if (activeGenre) params.set('genre', activeGenre);
+    if (activeShelf) params.set('shelf', activeShelf);
+    if (yearMinInput.value) params.set('yearMin', yearMinInput.value);
+    if (yearMaxInput.value) params.set('yearMax', yearMaxInput.value);
+    params.set('sort', sortSelect.value);
+    url = `/api/books?${params}`;
+  }
 
-  const res = await fetch(`/api/books?${params}`);
+  const res = await fetch(url);
   if (res.status === 401) {
     window.location.href = '/login';
     return;
@@ -346,7 +395,7 @@ async function loadBooks() {
         ${statusBadge}
         ${b.my_due ? `<span class="borrow-badge ${isOverdue(b.my_due) ? 'overdue' : ''}" title="${t().dueDate}: ${fmtDate(b.my_due)}">📖</span>` : ''}
         <div class="cover-icon">${iconSvg(meta.icon)}</div>
-        ${b.cover_url ? `<img class="cover-img" src="${escapeHtml(b.cover_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${b.cover_url ? `<img class="cover-img" src="${escapeHtml(b.cover_url)}" alt="" loading="lazy">` : ''}
       </div>
       <div class="book-info">
         <h3 class="book-title">${escapeHtml(bookTitle(b))}</h3>
@@ -360,6 +409,11 @@ async function loadBooks() {
       </div>
     </article>`;
   }).join('');
+
+  // CSP inline onerror'a izin vermediği için kırık kapaklar burada temizlenir
+  grid.querySelectorAll('.cover-img').forEach((img) => {
+    img.addEventListener('error', () => img.remove());
+  });
 }
 
 async function loadGenres() {
@@ -420,6 +474,7 @@ function setLang(next) {
   localStorage.setItem('lang', lang);
   applyLang();
   loadBooks();
+  renderAlerts();
 }
 
 // Topuzu sürükleyerek (veya tıklayarak) dil seçimi
@@ -510,13 +565,36 @@ function openModal(b) {
   const meta = genreMeta(b.genre);
   const overdue = b.my_due ? isOverdue(b.my_due) : false;
 
-  const loanChip = b.my_due
-    ? `<span class="m-chip loan ${overdue ? 'overdue' : ''}">📖 ${L.dueDate}: ${fmtDate(b.my_due)}${overdue ? ' — ' + L.overdueLabel : ''}</span>`
-    : `<span class="m-chip ${b.available > 0 ? '' : 'out'}">${b.available > 0 ? L.available(b.available, b.copies) : L.outOfStock}</span>`;
+  // Müsait kopyalar önce rezervasyon kuyruğuna ayrılır; sıradaysam ve sıram
+  // müsait kopya sayısına sığıyorsa alabilirim, kuyrukta değilsem artan kopya olmalı
+  const canBorrow = !b.my_due && b.available > 0 &&
+    (b.my_queue_pos > 0 ? b.my_queue_pos <= b.available : b.available - b.reservation_count > 0);
 
-  const borrowBtn = b.my_due
-    ? `<button class="m-action borrow active" data-act="return">↩ ${L.returnBook}</button>`
-    : `<button class="m-action borrow" data-act="borrow" ${b.available > 0 ? '' : 'disabled'}>📖 ${L.borrow}</button>`;
+  let loanChip;
+  if (b.my_due) {
+    loanChip = `<span class="m-chip loan ${overdue ? 'overdue' : ''}">📖 ${L.dueDate}: ${fmtDate(b.my_due)}${overdue ? ' — ' + L.overdueLabel : ''}</span>`;
+  } else if (b.my_queue_pos > 0) {
+    loanChip = canBorrow
+      ? `<span class="m-chip ready">🔔 ${L.reservationReady}</span>`
+      : `<span class="m-chip loan">🔖 ${L.queuePos(b.my_queue_pos)}</span>`;
+  } else if (b.available <= 0) {
+    loanChip = `<span class="m-chip out">${L.outOfStock}</span>`;
+  } else if (!canBorrow) {
+    loanChip = `<span class="m-chip out">${L.heldForQueue}</span>`;
+  } else {
+    loanChip = `<span class="m-chip">${L.available(b.available, b.copies)}</span>`;
+  }
+
+  let borrowBtn;
+  if (b.my_due) {
+    borrowBtn = `<button class="m-action borrow active" data-act="return">↩ ${L.returnBook}</button>`;
+  } else if (canBorrow) {
+    borrowBtn = `<button class="m-action borrow" data-act="borrow">📖 ${L.borrow}</button>`;
+  } else if (b.my_queue_pos > 0) {
+    borrowBtn = `<button class="m-action borrow active" data-act="unreserve">🔖 ${L.cancelReserve}</button>`;
+  } else {
+    borrowBtn = `<button class="m-action borrow" data-act="reserve">🔖 ${L.reserve}</button>`;
+  }
 
   modal.className = `modal ${meta.cls}`;
   modal.innerHTML = `
@@ -524,7 +602,7 @@ function openModal(b) {
     <div class="glass-content">
       <div class="modal-hero">
         ${b.cover_url
-          ? `<img class="modal-cover" src="${escapeHtml(b.cover_url)}" alt="" onerror="this.remove()">`
+          ? `<img class="modal-cover" src="${escapeHtml(b.cover_url)}" alt="">`
           : `<div class="modal-icon">${iconSvg(meta.icon)}</div>`}
         <div>
           <h2 class="modal-title">${escapeHtml(bookTitle(b))}</h2>
@@ -568,6 +646,8 @@ function openModal(b) {
     </div>
   `;
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  const modalCover = modal.querySelector('.modal-cover');
+  if (modalCover) modalCover.addEventListener('error', () => modalCover.remove());
 
   // --- Raf + ödünç aksiyonları ---
   const actionsEl = modal.querySelector('.modal-actions');
@@ -581,8 +661,13 @@ function openModal(b) {
         const data = await res.json();
         b.my_due = data.due_at;
         b.available = data.available;
+        if (b.my_queue_pos > 0) {
+          b.reservation_count = Math.max(0, b.reservation_count - 1);
+          b.my_queue_pos = 0;
+        }
         openModal(b);
         loadBooks();
+        loadAlerts();
       }
       return;
     }
@@ -593,6 +678,28 @@ function openModal(b) {
         b.available += 1;
         openModal(b);
         loadBooks();
+        loadAlerts();
+      }
+      return;
+    }
+    if (act === 'reserve') {
+      const res = await fetch(`/api/books/${b.id}/reserve`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        b.my_queue_pos = data.position;
+        b.reservation_count += 1;
+        openModal(b);
+        loadAlerts();
+      }
+      return;
+    }
+    if (act === 'unreserve') {
+      const res = await fetch(`/api/books/${b.id}/reserve`, { method: 'DELETE' });
+      if (res.ok) {
+        b.reservation_count = Math.max(0, b.reservation_count - 1);
+        b.my_queue_pos = 0;
+        openModal(b);
+        loadAlerts();
       }
       return;
     }
@@ -1135,3 +1242,4 @@ applyLang();
 loadMe();
 loadGenres();
 loadBooks();
+loadAlerts();
