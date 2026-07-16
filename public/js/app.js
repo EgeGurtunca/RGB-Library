@@ -93,7 +93,20 @@ const I18N = {
     topRated: 'En Yüksek Puanlılar',
     byGenre: 'Türlere Göre Dağılım',
     noData: 'Henüz veri yok.',
-    settings: 'Ayarlar',
+    profileTip: 'Profilim',
+    memberSince: 'Üyelik tarihi',
+    changePass: 'Şifre Değiştir',
+    currentPass: 'Mevcut şifre',
+    newPass: 'Yeni şifre (en az 6 karakter)',
+    passSaved: 'Şifren güncellendi ✓',
+    passFail: 'Şifre değiştirilemedi.',
+    myReviews: 'Değerlendirmelerim',
+    noMyReviews: 'Henüz değerlendirme yapmadın.',
+    myLoans: 'Ödünç Geçmişim',
+    noMyLoans: 'Henüz kitap ödünç almadın.',
+    returnedAt: 'İade edildi',
+    stillOut: 'Sende',
+  settings: 'Ayarlar',
     accentColor: 'Site Rengi',
     customColor: 'Özel renk seç',
     popupOpacity: 'Pop-up Opaklığı',
@@ -167,7 +180,20 @@ const I18N = {
     topRated: 'Top Rated',
     byGenre: 'Books by Genre',
     noData: 'No data yet.',
-    settings: 'Settings',
+    profileTip: 'My Profile',
+    memberSince: 'Member since',
+    changePass: 'Change Password',
+    currentPass: 'Current password',
+    newPass: 'New password (min 6 characters)',
+    passSaved: 'Password updated ✓',
+    passFail: 'Could not change password.',
+    myReviews: 'My Reviews',
+    noMyReviews: "You haven't reviewed any books yet.",
+    myLoans: 'My Loan History',
+    noMyLoans: "You haven't borrowed any books yet.",
+    returnedAt: 'Returned',
+    stillOut: 'Checked out',
+  settings: 'Settings',
     accentColor: 'Site Color',
     customColor: 'Pick a custom color',
     popupOpacity: 'Popup Opacity',
@@ -369,6 +395,7 @@ function applyLang() {
   const settingsBtn = document.getElementById('settings-btn');
   settingsBtn.title = L.settings;
   settingsBtn.setAttribute('aria-label', L.settings);
+  userChip.title = L.profileTip;
   document.querySelector('label[for="year-min"]').textContent = L.year;
   yearMinInput.placeholder = L.from;
   yearMaxInput.placeholder = L.to;
@@ -711,15 +738,16 @@ function openLoansModal() {
   showModal();
 }
 
+const statTile = (num, label, cls = '') =>
+  `<div class="stat-tile ${cls}"><span class="stat-num">${num}</span><span class="stat-label">${label}</span></div>`;
+
 // ============ Admin: istatistik paneli ============
 async function openStatsModal() {
   const L = t();
   const res = await fetch('/api/admin/stats');
   if (!res.ok) return;
   const { totals, topBorrowed, topRated, genres } = await res.json();
-
-  const tile = (num, label, cls = '') =>
-    `<div class="stat-tile ${cls}"><span class="stat-num">${num}</span><span class="stat-label">${label}</span></div>`;
+  const tile = statTile;
 
   // Tek serilik yatay çubuk listesi; değerler doğrudan satır sonunda yazılır
   const barList = (rows, nameOf, valueOf, labelOf, fixedMax) => {
@@ -757,6 +785,87 @@ async function openStatsModal() {
     </div>
   `;
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  showModal();
+}
+
+// ============ Profil ============
+async function openProfileModal() {
+  const L = t();
+  const res = await fetch('/api/profile');
+  if (!res.ok) return;
+  const p = await res.json();
+  const rowTitle = (r) => (lang === 'en' && r.title_en ? r.title_en : r.title);
+
+  const loanRow = (l) => {
+    const state = l.returned_at
+      ? `${L.returnedAt}: ${fmtDate(l.returned_at)}`
+      : `${L.stillOut} — ${L.dueDate}: ${fmtDate(l.due_at)}${l.overdue ? ' ⚠ ' + L.overdueLabel : ''}`;
+    return `
+    <div class="loan-item ${l.returned_at ? 'returned' : ''} ${l.overdue ? 'overdue' : ''}">
+      <div class="loan-info">
+        <span class="loan-book">${escapeHtml(rowTitle(l))}</span>
+        <span class="loan-dates">${L.borrowedAt}: ${fmtDate(l.borrowed_at)} · ${state}</span>
+      </div>
+    </div>`;
+  };
+
+  modal.className = 'modal';
+  modal.innerHTML = `
+    ${glassLayers}
+    <div class="glass-content">
+      <h2 class="modal-title form-title">👤 ${escapeHtml(p.username)}</h2>
+      <p class="profile-meta">${L.memberSince}: ${fmtDate(p.created_at)}${p.role === 'admin' ? ' · Admin' : ''}</p>
+      <div class="stats-grid profile-stats">
+        ${statTile(p.shelf.favorites, '♥ ' + L.actFav)}
+        ${statTile(p.shelf.read, L.actRead)}
+        ${statTile(p.shelf.toread, L.actToread)}
+        ${statTile(p.reviews.length, L.reviews)}
+      </div>
+      <h3 class="modal-sub">${L.changePass}</h3>
+      <form class="pass-form">
+        <input type="password" name="current" placeholder="${L.currentPass}" required autocomplete="current-password">
+        <input type="password" name="next" placeholder="${L.newPass}" required minlength="6" autocomplete="new-password">
+        <button type="submit" class="m-admin-btn">${L.save}</button>
+      </form>
+      <p class="form-error pass-msg" hidden></p>
+      <h3 class="modal-sub">${L.myLoans}</h3>
+      <div class="loans-list profile-loans">
+        ${p.loans.length ? p.loans.map(loanRow).join('') : `<p class="review-empty">${L.noMyLoans}</p>`}
+      </div>
+      <h3 class="modal-sub">${L.myReviews}</h3>
+      <div class="review-list">
+        ${p.reviews.length ? p.reviews.map((r) => `
+        <div class="review-item mine">
+          <div class="review-head">
+            <span class="review-user">${escapeHtml(rowTitle(r))}</span>
+            <span class="review-stars">${starRow(r.rating)}</span>
+            <span class="review-date">${fmtDate(r.created_at)}</span>
+          </div>
+          ${r.comment ? `<p class="review-text">${escapeHtml(r.comment)}</p>` : ''}
+        </div>`).join('') : `<p class="review-empty">${L.noMyReviews}</p>`}
+      </div>
+    </div>
+  `;
+  modal.querySelector('.modal-close').addEventListener('click', closeModal);
+
+  const form = modal.querySelector('.pass-form');
+  const msg = modal.querySelector('.pass-msg');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+    const data = Object.fromEntries(new FormData(form).entries());
+    const r = await fetch('/api/profile/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const body = await r.json().catch(() => ({}));
+    msg.classList.toggle('ok', r.ok);
+    msg.textContent = r.ok ? L.passSaved : (body.error || L.passFail);
+    msg.hidden = false;
+    if (r.ok) form.reset();
+  });
+
   showModal();
 }
 
@@ -983,6 +1092,7 @@ shelfChips.addEventListener('click', (e) => {
 addBookBtn.addEventListener('click', () => openFormModal(null));
 loansBtn.addEventListener('click', openLoansModal);
 statsBtn.addEventListener('click', openStatsModal);
+userChip.addEventListener('click', openProfileModal);
 document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
 
 let debounceTimer;

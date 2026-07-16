@@ -107,6 +107,46 @@ app.get('/api/me', requireAuth, (req, res) => {
   res.json({ user: username, role });
 });
 
+// --- Profil ---
+app.get('/api/profile', requireAuth, (req, res) => {
+  const userId = req.session.user.id;
+  const me = db.prepare('SELECT username, role, created_at FROM users WHERE id = ?').get(userId);
+  const shelf = db.prepare(`
+    SELECT COALESCE(SUM(favorite), 0) AS favorites,
+      COALESCE(SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END), 0) AS read,
+      COALESCE(SUM(CASE WHEN status = 'toread' THEN 1 ELSE 0 END), 0) AS toread
+    FROM user_books WHERE user_id = ?
+  `).get(userId);
+  const reviews = db.prepare(`
+    SELECT r.book_id, r.rating, r.comment, r.created_at, b.title, b.title_en
+    FROM reviews r JOIN books b ON b.id = r.book_id
+    WHERE r.user_id = ? ORDER BY r.created_at DESC
+  `).all(userId);
+  const loans = db.prepare(`
+    SELECT l.borrowed_at, l.due_at, l.returned_at, b.title, b.title_en,
+      (l.returned_at IS NULL AND l.due_at < datetime('now')) AS overdue
+    FROM loans l JOIN books b ON b.id = l.book_id
+    WHERE l.user_id = ? ORDER BY l.borrowed_at DESC LIMIT 50
+  `).all(userId);
+  res.json({ ...me, shelf, reviews, loans });
+});
+
+app.post('/api/profile/password', requireAuth, (req, res) => {
+  const { current, next } = req.body || {};
+  if (typeof current !== 'string' || typeof next !== 'string') {
+    return res.status(400).json({ error: 'Mevcut ve yeni şifre gerekli.' });
+  }
+  if (next.length < 6) {
+    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
+  }
+  const user = db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(req.session.user.id);
+  if (!verifyPassword(current, user.password_hash)) {
+    return res.status(401).json({ error: 'Mevcut şifre hatalı.' });
+  }
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(next), user.id);
+  res.json({ ok: true });
+});
+
 // --- Kitaplar ---
 app.get('/api/genres', requireAuth, (req, res) => {
   const rows = db.prepare('SELECT DISTINCT genre FROM books ORDER BY genre').all();

@@ -51,7 +51,7 @@ Kapağı olmayan kitaplar için [Open Library](https://openlibrary.org/dev/docs/
 
 | Rol | Yetkiler |
 |-----|----------|
-| `user` | Kitapları görüntüleme, arama/filtreleme, kişisel raf (favori + okuma durumu), yıldız + yorum, ödünç alma/iade |
+| `user` | Kitapları görüntüleme, arama/filtreleme, kişisel raf (favori + okuma durumu), yıldız + yorum, ödünç alma/iade, profil (raf özeti, ödünç geçmişi, değerlendirmeler, şifre değiştirme — üst barda kullanıcı adına tıklayınca açılır) |
 | `admin` | Ek olarak: kitap ekleme/düzenleme/silme, yorum kaldırma, tüm aktif ödünçleri görme ve iade alma, istatistik paneli |
 
 ## Puanlama ve ödünç kuralları
@@ -74,6 +74,8 @@ Giriş ve kayıt uçları **hız sınırlıdır**: aynı IP'den 10 dakika içind
 | POST | `/api/login` | — | Giriş — gövde: `{ "username", "password" }` |
 | POST | `/api/logout` | oturum | Oturumu sonlandırır |
 | GET | `/api/me` | oturum | Oturumdaki kullanıcıyı ve rolünü döner |
+| GET | `/api/profile` | oturum | Profil: üyelik bilgisi, raf özeti, değerlendirmeler, ödünç geçmişi (son 50) |
+| POST | `/api/profile/password` | oturum | Şifre değiştirir — gövde: `{ "current", "next" }` (yeni şifre ≥ 6 karakter) |
 | GET | `/api/genres` | oturum | Mevcut kitap türlerini listeler |
 | GET | `/api/books` | oturum | Kitapları listeler (filtre/sıralama/raf destekli) |
 | POST | `/api/books` | admin | Yeni kitap ekler |

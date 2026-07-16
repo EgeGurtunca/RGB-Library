@@ -1088,6 +1088,39 @@ input, select { font-family: inherit; }
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
+/* ============ Profil ============ */
+.user-chip { cursor: pointer; transition: border-color 0.2s; }
+.user-chip:hover { border-color: var(--accent); }
+
+.profile-meta {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: -12px 0 18px;
+}
+
+.stats-grid.profile-stats { grid-template-columns: repeat(4, 1fr); }
+
+.pass-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.pass-form input {
+  flex: 1 1 180px;
+  padding: 9px 13px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.pass-form input:focus { outline: none; border-color: var(--accent); }
+.pass-msg.ok { color: #6fd9b9; }
+
+.loan-item.returned { opacity: 0.6; }
+
 /* ============ İstatistik paneli ============ */
 .stats-grid {
   display: grid;
@@ -1149,7 +1182,6 @@ input, select { font-family: inherit; }
   .topbar-inner { flex-wrap: wrap; }
   .search-wrap { order: 3; max-width: none; width: 100%; }
   .result-count { margin-left: 0; width: 100%; }
-  .user-chip { display: none; }
   .form-grid { grid-template-columns: 1fr 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid, .stats-grid.profile-stats { grid-template-columns: repeat(2, 1fr); }
 }
