@@ -1,6 +1,6 @@
 # RGB Library
 
-Oturum korumalı bir kitap kütüphanesi web uygulaması. Kitaplar arasında arama, tür/yıl filtreleme ve sıralama yapılabilir; kullanıcılar kayıt olup kendi raflarını (favoriler, okuduklarım, okuyacaklarım) yönetebilir, kitaplara yıldız + yorum bırakabilir ve kitap ödünç alabilir; adminler kitap ekleyip düzenleyebilir ve aktif ödünçleri yönetebilir. Veritabanı ilk çalıştırmada 100 kitapla otomatik doldurulur.
+Oturum korumalı bir kitap kütüphanesi web uygulaması. Kitaplar arasında arama, tür/yıl filtreleme ve sıralama yapılabilir; kullanıcılar kayıt olup kendi raflarını (favoriler, okuduklarım, okuyacaklarım) yönetebilir, kitaplara yıldız + yorum bırakabilir ve kitap ödünç alabilir; adminler kitap ekleyip düzenleyebilir, aktif ödünçleri yönetebilir ve kütüphane istatistiklerini görebilir. Veritabanı ilk çalıştırmada 100 kitapla otomatik doldurulur; kitap kapakları Open Library'den tek komutla çekilebilir.
 
 ## Teknolojiler
 
@@ -39,12 +39,20 @@ Tarayıcıda `http://localhost:3000` adresini açın. Giriş yapmadan ana sayfay
 - İlk çalıştırmada `.env`'deki `ADMIN_USER` / `ADMIN_PASS` ile bir **admin** hesabı oluşturulur (şifre scrypt ile hash'lenerek saklanır).
 - Yeni kullanıcılar giriş sayfasındaki **"Kayıt olun"** bağlantısıyla hesap açabilir (rol: `user`).
 
+### Kitap kapakları
+
+```bash
+npm run covers
+```
+
+Kapağı olmayan kitaplar için [Open Library](https://openlibrary.org/dev/docs/api/search)'de arama yapar ve bulunan kapak görsellerinin URL'lerini veritabanına yazar (görseller `covers.openlibrary.org` üzerinden tarayıcıda yüklenir). İstenildiği kadar tekrar çalıştırılabilir; kapak bulunamayan kitaplar tür ikonuyla görünmeye devam eder. Admin, kitap formundaki **Kapak URL** alanından kapağı elle de ayarlayabilir.
+
 ## Roller
 
 | Rol | Yetkiler |
 |-----|----------|
 | `user` | Kitapları görüntüleme, arama/filtreleme, kişisel raf (favori + okuma durumu), yıldız + yorum, ödünç alma/iade |
-| `admin` | Ek olarak: kitap ekleme/düzenleme/silme, yorum kaldırma, tüm aktif ödünçleri görme ve iade alma |
+| `admin` | Ek olarak: kitap ekleme/düzenleme/silme, yorum kaldırma, tüm aktif ödünçleri görme ve iade alma, istatistik paneli |
 
 ## Puanlama ve ödünç kuralları
 
@@ -57,6 +65,8 @@ Tarayıcıda `http://localhost:3000` adresini açın. Giriş yapmadan ana sayfay
 ## API
 
 Tüm `/api` uçları (login/register hariç) oturum gerektirir; oturum yoksa `401` döner. Admin gerektiren uçlar yetkisiz kullanıcıya `403` döner.
+
+Giriş ve kayıt uçları **hız sınırlıdır**: aynı IP'den 10 dakika içinde en fazla 20 deneme yapılabilir, aşımda `429` döner (brute-force koruması).
 
 | Metot | Yol | Yetki | Açıklama |
 |-------|-----|-------|----------|
@@ -78,6 +88,7 @@ Tüm `/api` uçları (login/register hariç) oturum gerektirir; oturum yoksa `40
 | POST | `/api/books/:id/return` | oturum | Ödünç alınan kitabı iade eder |
 | GET | `/api/admin/loans` | admin | Tüm aktif ödünçler (gecikme bilgisiyle) |
 | POST | `/api/admin/loans/:loanId/return` | admin | Kullanıcı adına iade alır |
+| GET | `/api/admin/stats` | admin | İstatistikler: toplamlar, en çok ödünç alınanlar, en yüksek puanlılar, tür dağılımı |
 
 ### `/api/books` sorgu parametreleri
 
@@ -97,7 +108,7 @@ GET /api/books?search=orwell&genre=Bilim%20Kurgu&sort=rating&shelf=favorites
 
 ## Veritabanı şeması
 
-- **books** — id, title, title_en, author, genre, year, pages, rating (seed puanı), copies (kopya stoku), description
+- **books** — id, title, title_en, author, genre, year, pages, rating (seed puanı), copies (kopya stoku), description, cover_url
 - **users** — id, username (benzersiz, harf duyarsız), password_hash (scrypt), role (`admin`/`user`), created_at
 - **user_books** — user_id + book_id (bileşik anahtar), favorite (0/1), status (`read`/`toread`)
 - **reviews** — user_id + book_id (bileşik anahtar), rating (1–5), comment, created_at
@@ -112,6 +123,8 @@ Kullanıcı veya kitap silinince bağlı satırlar da silinir (CASCADE).
 ├── auth.js          # scrypt şifre hash'leme / doğrulama
 ├── db.js            # SQLite bağlantısı, şema ve seed verisi
 ├── library.db       # Veritabanı (git'e dahil değil, otomatik oluşur)
+├── scripts/
+│   └── fetch-covers.js  # Open Library'den kitap kapaklarını çeker (npm run covers)
 └── public/
     ├── index.html   # Kütüphane arayüzü
     ├── login.html   # Giriş / kayıt sayfası

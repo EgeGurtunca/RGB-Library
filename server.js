@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const db = require('./db');
 const { hashPassword, verifyPassword } = require('./auth');
@@ -57,7 +58,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/vendor/liquid-glass', express.static(path.join(__dirname, 'node_modules', '@avenra', 'liquid-glass')));
 
 // --- Kimlik doğrulama ---
-app.post('/api/register', (req, res) => {
+// Brute-force koruması: aynı IP'den 10 dakikada en fazla 20 giriş/kayıt denemesi
+const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Çok fazla deneme yaptınız. Lütfen 10 dakika sonra tekrar deneyin.' },
+});
+
+app.post('/api/register', authLimiter, (req, res) => {
   const { username, password } = req.body || {};
   const name = typeof username === 'string' ? username.trim() : '';
   if (name.length < 3 || name.length > 30) {
@@ -75,7 +85,7 @@ app.post('/api/register', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', authLimiter, (req, res) => {
   const { username, password } = req.body || {};
   if (typeof username !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli.' });
@@ -170,6 +180,7 @@ const parseBook = (body) => {
   const pages = Number(b.pages);
   const rating = Number(b.rating);
   const copies = b.copies === undefined ? 3 : Number(b.copies);
+  const coverUrl = String(b.cover_url ?? '').trim();
 
   if (!title || !author || !genre || !description) {
     return { error: 'Başlık, yazar, tür ve açıklama boş olamaz.' };
@@ -186,15 +197,18 @@ const parseBook = (body) => {
   if (!Number.isInteger(copies) || copies < 0 || copies > 1000) {
     return { error: 'Kopya sayısı 0 ile 1000 arasında bir tam sayı olmalı.' };
   }
-  return { book: { title, title_en: titleEn || null, author, genre, year, pages, rating, copies, description } };
+  if (coverUrl && !/^https?:\/\/\S+$/i.test(coverUrl)) {
+    return { error: 'Kapak adresi http(s) ile başlayan geçerli bir URL olmalı.' };
+  }
+  return { book: { title, title_en: titleEn || null, author, genre, year, pages, rating, copies, description, cover_url: coverUrl || null } };
 };
 
 app.post('/api/books', requireAuth, requireAdmin, (req, res) => {
   const { error, book } = parseBook(req.body);
   if (error) return res.status(400).json({ error });
   const info = db.prepare(`
-    INSERT INTO books (title, title_en, author, genre, year, pages, rating, copies, description)
-    VALUES (@title, @title_en, @author, @genre, @year, @pages, @rating, @copies, @description)
+    INSERT INTO books (title, title_en, author, genre, year, pages, rating, copies, description, cover_url)
+    VALUES (@title, @title_en, @author, @genre, @year, @pages, @rating, @copies, @description, @cover_url)
   `).run(book);
   const created = db.prepare('SELECT * FROM books WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json(created);
@@ -209,7 +223,8 @@ app.put('/api/books/:id', requireAuth, requireAdmin, (req, res) => {
   if (error) return res.status(400).json({ error });
   db.prepare(`
     UPDATE books SET title = @title, title_en = @title_en, author = @author, genre = @genre,
-      year = @year, pages = @pages, rating = @rating, copies = @copies, description = @description
+      year = @year, pages = @pages, rating = @rating, copies = @copies, description = @description,
+      cover_url = @cover_url
     WHERE id = @id
   `).run({ ...book, id });
   res.json(db.prepare('SELECT * FROM books WHERE id = ?').get(id));
@@ -357,6 +372,33 @@ app.post('/api/admin/loans/:loanId/return', requireAuth, requireAdmin, (req, res
     .run(Number(req.params.loanId));
   if (info.changes === 0) return res.status(404).json({ error: 'Aktif ödünç kaydı bulunamadı.' });
   res.json({ ok: true });
+});
+
+// Admin: istatistikler
+app.get('/api/admin/stats', requireAuth, requireAdmin, (req, res) => {
+  const count = (sql) => db.prepare(sql).get().c;
+  const totals = {
+    books: count('SELECT COUNT(*) AS c FROM books'),
+    users: count('SELECT COUNT(*) AS c FROM users'),
+    reviews: count('SELECT COUNT(*) AS c FROM reviews'),
+    totalLoans: count('SELECT COUNT(*) AS c FROM loans'),
+    activeLoans: count('SELECT COUNT(*) AS c FROM loans WHERE returned_at IS NULL'),
+    overdueLoans: count(`SELECT COUNT(*) AS c FROM loans WHERE returned_at IS NULL AND due_at < datetime('now')`),
+  };
+  const topBorrowed = db.prepare(`
+    SELECT b.title, b.title_en, COUNT(*) AS loan_count
+    FROM loans l JOIN books b ON b.id = l.book_id
+    GROUP BY l.book_id ORDER BY loan_count DESC, b.title COLLATE NOCASE LIMIT 5
+  `).all();
+  const topRated = db.prepare(`
+    SELECT b.title, b.title_en, AVG(r.rating) AS avg_rating, COUNT(*) AS review_count
+    FROM reviews r JOIN books b ON b.id = r.book_id
+    GROUP BY r.book_id ORDER BY avg_rating DESC, review_count DESC, b.title COLLATE NOCASE LIMIT 5
+  `).all();
+  const genres = db.prepare(`
+    SELECT genre, COUNT(*) AS book_count FROM books GROUP BY genre ORDER BY book_count DESC
+  `).all();
+  res.json({ totals, topBorrowed, topRated, genres });
 });
 
 // --- Hata yönetimi ---

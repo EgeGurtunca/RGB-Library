@@ -9,6 +9,7 @@ const genreChips = document.getElementById('genre-chips');
 const shelfChips = document.getElementById('shelf-chips');
 const addBookBtn = document.getElementById('add-book-btn');
 const loansBtn = document.getElementById('loans-btn');
+const statsBtn = document.getElementById('stats-btn');
 const userChip = document.getElementById('user-chip');
 const userNameEl = document.getElementById('user-name');
 
@@ -79,6 +80,19 @@ const I18N = {
     noLoans: 'Aktif ödünç yok.',
     adminReturn: 'İade Al',
     borrowedAt: 'Alış',
+    fCover: 'Kapak URL (isteğe bağlı)',
+    statsBtn: 'İstatistik',
+    statsTitle: 'Kütüphane İstatistikleri',
+    stBooks: 'Kitap',
+    stUsers: 'Üye',
+    stReviews: 'Değerlendirme',
+    stTotalLoans: 'Toplam Ödünç',
+    stActive: 'Aktif Ödünç',
+    stOverdue: 'Gecikmiş',
+    topBorrowed: 'En Çok Ödünç Alınanlar',
+    topRated: 'En Yüksek Puanlılar',
+    byGenre: 'Türlere Göre Dağılım',
+    noData: 'Henüz veri yok.',
     settings: 'Ayarlar',
     accentColor: 'Site Rengi',
     customColor: 'Özel renk seç',
@@ -140,6 +154,19 @@ const I18N = {
     noLoans: 'No active loans.',
     adminReturn: 'Mark Returned',
     borrowedAt: 'Borrowed',
+    fCover: 'Cover URL (optional)',
+    statsBtn: 'Stats',
+    statsTitle: 'Library Statistics',
+    stBooks: 'Books',
+    stUsers: 'Users',
+    stReviews: 'Reviews',
+    stTotalLoans: 'Total Loans',
+    stActive: 'Active Loans',
+    stOverdue: 'Overdue',
+    topBorrowed: 'Most Borrowed',
+    topRated: 'Top Rated',
+    byGenre: 'Books by Genre',
+    noData: 'No data yet.',
     settings: 'Settings',
     accentColor: 'Site Color',
     customColor: 'Pick a custom color',
@@ -245,6 +272,7 @@ async function loadMe() {
   userChip.hidden = false;
   addBookBtn.hidden = !isAdmin();
   loansBtn.hidden = !isAdmin();
+  statsBtn.hidden = !isAdmin();
 }
 
 // ============ Raf güncelleme (favori / okuma durumu) ============
@@ -292,6 +320,7 @@ async function loadBooks() {
         ${statusBadge}
         ${b.my_due ? `<span class="borrow-badge ${isOverdue(b.my_due) ? 'overdue' : ''}" title="${t().dueDate}: ${fmtDate(b.my_due)}">📖</span>` : ''}
         <div class="cover-icon">${iconSvg(meta.icon)}</div>
+        ${b.cover_url ? `<img class="cover-img" src="${escapeHtml(b.cover_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
       </div>
       <div class="book-info">
         <h3 class="book-title">${escapeHtml(bookTitle(b))}</h3>
@@ -336,6 +365,7 @@ function applyLang() {
   else document.getElementById('logout-btn').textContent = L.logout;
   addBookBtn.textContent = L.addBook;
   loansBtn.textContent = L.loansBtn;
+  statsBtn.textContent = L.statsBtn;
   const settingsBtn = document.getElementById('settings-btn');
   settingsBtn.title = L.settings;
   settingsBtn.setAttribute('aria-label', L.settings);
@@ -466,7 +496,9 @@ function openModal(b) {
     ${glassLayers}
     <div class="glass-content">
       <div class="modal-hero">
-        <div class="modal-icon">${iconSvg(meta.icon)}</div>
+        ${b.cover_url
+          ? `<img class="modal-cover" src="${escapeHtml(b.cover_url)}" alt="" onerror="this.remove()">`
+          : `<div class="modal-icon">${iconSvg(meta.icon)}</div>`}
         <div>
           <h2 class="modal-title">${escapeHtml(bookTitle(b))}</h2>
           <p class="modal-author">${escapeHtml(b.author)}</p>
@@ -679,6 +711,55 @@ function openLoansModal() {
   showModal();
 }
 
+// ============ Admin: istatistik paneli ============
+async function openStatsModal() {
+  const L = t();
+  const res = await fetch('/api/admin/stats');
+  if (!res.ok) return;
+  const { totals, topBorrowed, topRated, genres } = await res.json();
+
+  const tile = (num, label, cls = '') =>
+    `<div class="stat-tile ${cls}"><span class="stat-num">${num}</span><span class="stat-label">${label}</span></div>`;
+
+  // Tek serilik yatay çubuk listesi; değerler doğrudan satır sonunda yazılır
+  const barList = (rows, nameOf, valueOf, labelOf, fixedMax) => {
+    if (!rows.length) return `<p class="review-empty">${L.noData}</p>`;
+    const max = fixedMax || Math.max(...rows.map(valueOf), 1);
+    return `<div class="bar-list">${rows.map((r) => `
+      <div class="bar-row">
+        <span class="bar-name" title="${escapeHtml(nameOf(r))}">${escapeHtml(nameOf(r))}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((valueOf(r) / max) * 100)}%"></div></div>
+        <span class="bar-val">${labelOf(r)}</span>
+      </div>`).join('')}</div>`;
+  };
+
+  const rowTitle = (r) => (lang === 'en' && r.title_en ? r.title_en : r.title);
+
+  modal.className = 'modal';
+  modal.innerHTML = `
+    ${glassLayers}
+    <div class="glass-content">
+      <h2 class="modal-title form-title">📊 ${L.statsTitle}</h2>
+      <div class="stats-grid">
+        ${tile(totals.books, L.stBooks)}
+        ${tile(totals.users, L.stUsers)}
+        ${tile(totals.reviews, L.stReviews)}
+        ${tile(totals.totalLoans, L.stTotalLoans)}
+        ${tile(totals.activeLoans, L.stActive)}
+        ${tile(totals.overdueLoans, L.stOverdue, totals.overdueLoans ? 'warn' : '')}
+      </div>
+      <h3 class="modal-sub">${L.topBorrowed}</h3>
+      ${barList(topBorrowed, rowTitle, (r) => r.loan_count, (r) => r.loan_count)}
+      <h3 class="modal-sub">${L.topRated}</h3>
+      ${barList(topRated, rowTitle, (r) => r.avg_rating, (r) => `★ ${Number(r.avg_rating).toFixed(1)} (${r.review_count})`, 5)}
+      <h3 class="modal-sub">${L.byGenre}</h3>
+      ${barList(genres, (r) => genreLabel(r.genre), (r) => r.book_count, (r) => r.book_count)}
+    </div>
+  `;
+  modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  showModal();
+}
+
 // ============ Kitap ekleme / düzenleme formu (admin) ============
 function openFormModal(book) {
   const L = t();
@@ -725,6 +806,10 @@ function openFormModal(book) {
           <div class="form-field">
             <label>${L.fCopies}</label>
             <input name="copies" type="number" required min="0" max="1000" value="${isEdit ? book.copies : 3}">
+          </div>
+          <div class="form-field span-2">
+            <label>${L.fCover}</label>
+            <input name="cover_url" type="url" maxlength="500" placeholder="https://..." value="${v('cover_url')}">
           </div>
           <div class="form-field span-2">
             <label>${L.fDesc}</label>
@@ -897,6 +982,7 @@ shelfChips.addEventListener('click', (e) => {
 
 addBookBtn.addEventListener('click', () => openFormModal(null));
 loansBtn.addEventListener('click', openLoansModal);
+statsBtn.addEventListener('click', openStatsModal);
 document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
 
 let debounceTimer;

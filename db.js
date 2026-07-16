@@ -163,6 +163,9 @@ if (!bookColumns.includes('title_en')) {
 if (!bookColumns.includes('copies')) {
   db.exec('ALTER TABLE books ADD COLUMN copies INTEGER NOT NULL DEFAULT 3');
 }
+if (!bookColumns.includes('cover_url')) {
+  db.exec('ALTER TABLE books ADD COLUMN cover_url TEXT');
+}
 
 // Seed kitaplarının yayımlanmış İngilizce başlıkları.
 // Yalnızca gerçekten İngilizce baskısı/çevirisi olan eserler listede;
