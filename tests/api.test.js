@@ -95,6 +95,43 @@ test('tür filtresi yalnızca o türü döndürür', async () => {
   assert.ok(res.body.books.every((b) => b.genre === 'Felsefe'));
 });
 
+// ---- Sayfalama ----
+
+test('kitap listesi sayfalanır: count toplam kalır, books sayfa kadar gelir', async () => {
+  const res = await user1.get('/api/books').query({ pageSize: 10 });
+  assert.equal(res.body.count, 100);
+  assert.equal(res.body.books.length, 10);
+  assert.equal(res.body.page, 1);
+  assert.equal(res.body.pageCount, 10);
+});
+
+test('ikinci sayfa ilk sayfanın devamını getirir, kesişmez', async () => {
+  const p1 = await user1.get('/api/books').query({ pageSize: 10, page: 1 });
+  const p2 = await user1.get('/api/books').query({ pageSize: 10, page: 2 });
+  assert.equal(p2.body.page, 2);
+  assert.equal(p2.body.books.length, 10);
+  const ids1 = new Set(p1.body.books.map((b) => b.id));
+  assert.ok(p2.body.books.every((b) => !ids1.has(b.id)), 'sayfalar kesişmemeli');
+});
+
+test('aralık dışı sayfa isteği son sayfaya sabitlenir', async () => {
+  const res = await user1.get('/api/books').query({ pageSize: 30, page: 999 });
+  assert.equal(res.body.page, res.body.pageCount);
+  assert.ok(res.body.books.length > 0);
+
+  const bad = await user1.get('/api/books').query({ page: 'abc', pageSize: -5 });
+  assert.equal(bad.status, 200);
+  assert.equal(bad.body.page, 1);
+});
+
+test('filtre + sayfalama birlikte çalışır', async () => {
+  const all = await user1.get('/api/books').query({ genre: 'Roman' });
+  const paged = await user1.get('/api/books').query({ genre: 'Roman', pageSize: 5 });
+  assert.equal(paged.body.count, all.body.count);
+  assert.ok(paged.body.books.length <= 5);
+  assert.ok(paged.body.books.every((b) => b.genre === 'Roman'));
+});
+
 // ---- Kitap CRUD yetkileri ----
 
 const newBook = {

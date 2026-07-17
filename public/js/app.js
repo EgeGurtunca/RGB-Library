@@ -7,6 +7,7 @@ const yearMaxInput = document.getElementById('year-max');
 const sortSelect = document.getElementById('sort');
 const genreChips = document.getElementById('genre-chips');
 const shelfChips = document.getElementById('shelf-chips');
+const paginationEl = document.getElementById('pagination');
 const addBookBtn = document.getElementById('add-book-btn');
 const loansBtn = document.getElementById('loans-btn');
 const statsBtn = document.getElementById('stats-btn');
@@ -18,6 +19,7 @@ const modal = document.getElementById('modal');
 
 let activeGenre = '';
 let activeShelf = '';
+let currentPage = 1;
 let currentBooks = [];
 let knownGenres = [];
 let currentUser = null;
@@ -37,6 +39,9 @@ const I18N = {
     sortOptions: ['Başlığa göre (A–Z)', 'Puana göre', 'Yıla göre (yeni → eski)', 'Yıla göre (eski → yeni)'],
     found: (n) => `${n} kitap bulundu`,
     empty: 'Aradığınız kriterlere uygun kitap bulunamadı. 🔍',
+    pagePrev: 'Önceki sayfa',
+    pageNext: 'Sonraki sayfa',
+    pageOf: (p, pc) => `Sayfa ${p} / ${pc}`,
     pages: 'sayfa',
     summary: 'Özet',
     brand: 'Kütüphane',
@@ -133,6 +138,9 @@ const I18N = {
     sortOptions: ['By title (A–Z)', 'By rating', 'By year (newest first)', 'By year (oldest first)'],
     found: (n) => `${n} ${n === 1 ? 'book' : 'books'} found`,
     empty: 'No books match your criteria. 🔍',
+    pagePrev: 'Previous page',
+    pageNext: 'Next page',
+    pageOf: (p, pc) => `Page ${p} of ${pc}`,
     pages: 'pages',
     summary: 'Summary',
     brand: 'Library',
@@ -356,10 +364,41 @@ async function setShelf(book, patch) {
   book.status = data.status;
 }
 
+// Sayfa numaraları: 1 ... (p-1) p (p+1) ... son — aradaki boşluklar "…" ile kısaltılır
+function pageItems(page, pageCount) {
+  const wanted = new Set([1, 2, page - 1, page, page + 1, pageCount - 1, pageCount]);
+  const items = [];
+  let prev = 0;
+  for (let i = 1; i <= pageCount; i++) {
+    if (!wanted.has(i)) continue;
+    if (prev && i - prev > 1) items.push('gap');
+    items.push(i);
+    prev = i;
+  }
+  return items;
+}
+
+function renderPagination(page, pageCount) {
+  if (!pageCount || pageCount <= 1) {
+    paginationEl.hidden = true;
+    paginationEl.innerHTML = '';
+    return;
+  }
+  const L = t();
+  paginationEl.innerHTML = [
+    `<button class="page-btn nav" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="${L.pagePrev}">‹</button>`,
+    ...pageItems(page, pageCount).map((it) => it === 'gap'
+      ? '<span class="page-gap">…</span>'
+      : `<button class="page-btn ${it === page ? 'active' : ''}" data-page="${it}">${it}</button>`),
+    `<button class="page-btn nav" data-page="${page + 1}" ${page >= pageCount ? 'disabled' : ''} aria-label="${L.pageNext}">›</button>`,
+  ].join('');
+  paginationEl.hidden = false;
+}
+
 async function loadBooks() {
   let url;
   if (activeShelf === 'recommended') {
-    // Öneriler kendi skoruna göre sıralanır; diğer filtreler uygulanmaz
+    // Öneriler kendi skoruna göre sıralanır; diğer filtreler ve sayfalama uygulanmaz
     url = '/api/recommendations';
   } else {
     const params = new URLSearchParams();
@@ -369,6 +408,7 @@ async function loadBooks() {
     if (yearMinInput.value) params.set('yearMin', yearMinInput.value);
     if (yearMaxInput.value) params.set('yearMax', yearMaxInput.value);
     params.set('sort', sortSelect.value);
+    params.set('page', currentPage);
     url = `/api/books?${params}`;
   }
 
@@ -377,7 +417,11 @@ async function loadBooks() {
     window.location.href = '/login';
     return;
   }
-  const { count, books } = await res.json();
+  const { count, books, page, pageCount } = await res.json();
+
+  // Sunucu sayfayı sınırlamış olabilir (ör. filtre değişince sayfa sayısı azaldı)
+  if (page) currentPage = page;
+  renderPagination(page, pageCount);
 
   resultCount.textContent = t().found(count);
   emptyState.hidden = count > 0;
@@ -1184,6 +1228,7 @@ genreChips.addEventListener('click', (e) => {
   genreChips.querySelector('.chip.active')?.classList.remove('active');
   chip.classList.add('active');
   activeGenre = chip.dataset.genre;
+  currentPage = 1;
   loadBooks();
 });
 
@@ -1193,7 +1238,18 @@ shelfChips.addEventListener('click', (e) => {
   shelfChips.querySelector('.chip.active')?.classList.remove('active');
   chip.classList.add('active');
   activeShelf = chip.dataset.shelf;
+  currentPage = 1;
   loadBooks();
+});
+
+paginationEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.page-btn');
+  if (!btn || btn.disabled) return;
+  const next = Number(btn.dataset.page);
+  if (next === currentPage) return;
+  currentPage = next;
+  loadBooks();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 addBookBtn.addEventListener('click', () => openFormModal(null));
@@ -1202,22 +1258,28 @@ statsBtn.addEventListener('click', openStatsModal);
 userChip.addEventListener('click', openProfileModal);
 document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
 
+// Filtre değişince ilk sayfaya dönülür
+const filterChanged = () => {
+  currentPage = 1;
+  loadBooks();
+};
+
 let debounceTimer;
 searchInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(loadBooks, 250);
+  debounceTimer = setTimeout(filterChanged, 250);
 });
 
 yearMinInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(loadBooks, 350);
+  debounceTimer = setTimeout(filterChanged, 350);
 });
 yearMaxInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(loadBooks, 350);
+  debounceTimer = setTimeout(filterChanged, 350);
 });
 
-sortSelect.addEventListener('change', loadBooks);
+sortSelect.addEventListener('change', filterChanged);
 
 // Çıkış butonu — fizik tabanlı liquid glass (Chromium'da kırılma, diğerlerinde buzlu cam)
 // Not: liquid-glass kendi etiket span'ını ekler; HTML'deki metin silinmezse yazı iki kez görünür.

@@ -166,37 +166,42 @@ app.get('/api/genres', requireAuth, (req, res) => {
   res.json(rows.map(r => r.genre));
 });
 
+const DEFAULT_PAGE_SIZE = 24;
+const toPositiveInt = (value, fallback) => {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 app.get('/api/books', requireAuth, (req, res) => {
   const { search, genre, yearMin, yearMax, sort, shelf } = req.query;
   const userId = req.session.user.id;
   const conditions = [];
-  // Sıra önemli: SQL'deki ilk üç ? my_due, my_queue_pos ve user_books join'i
-  const params = [userId, userId, userId];
+  const condParams = [];
 
   if (search) {
     conditions.push('(title LIKE ? OR author LIKE ? OR title_en LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    condParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (genre) {
     conditions.push('genre = ?');
-    params.push(genre);
+    condParams.push(genre);
   }
   if (yearMin) {
     conditions.push('year >= ?');
-    params.push(Number(yearMin));
+    condParams.push(Number(yearMin));
   }
   if (yearMax) {
     conditions.push('year <= ?');
-    params.push(Number(yearMax));
+    condParams.push(Number(yearMax));
   }
   if (shelf === 'favorites') {
     conditions.push('ub.favorite = 1');
   } else if (shelf === 'read' || shelf === 'toread') {
     conditions.push('ub.status = ?');
-    params.push(shelf);
+    condParams.push(shelf);
   } else if (shelf === 'borrowed') {
     conditions.push('EXISTS (SELECT 1 FROM loans lx WHERE lx.book_id = b.id AND lx.user_id = ? AND lx.returned_at IS NULL)');
-    params.push(userId);
+    condParams.push(userId);
   }
 
   const sortMap = {
@@ -208,6 +213,18 @@ app.get('/api/books', requireAuth, (req, res) => {
   const orderBy = sortMap[sort] || sortMap['title'];
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // count = filtreye uyan TOPLAM kitap; books yalnızca istenen sayfayı taşır
+  const total = db.prepare(`
+    SELECT COUNT(*) AS c FROM books b
+    LEFT JOIN user_books ub ON ub.book_id = b.id AND ub.user_id = ?
+    ${where}
+  `).get(userId, ...condParams).c;
+
+  const pageSize = Math.min(toPositiveInt(req.query.pageSize, DEFAULT_PAGE_SIZE), 100);
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+  const page = Math.min(toPositiveInt(req.query.page, 1), pageCount);
+
   const books = db.prepare(`
     SELECT b.*,
       COALESCE(ub.favorite, 0) AS favorite, ub.status AS status,
@@ -222,8 +239,9 @@ app.get('/api/books', requireAuth, (req, res) => {
     FROM books b
     LEFT JOIN user_books ub ON ub.book_id = b.id AND ub.user_id = ?
     ${where} ORDER BY ${orderBy}
-  `).all(...params);
-  res.json({ count: books.length, books });
+    LIMIT ? OFFSET ?
+  `).all(userId, userId, userId, ...condParams, pageSize, (page - 1) * pageSize);
+  res.json({ count: total, page, pageCount, pageSize, books });
 });
 
 // Kişiye özel öneriler: kullanıcının etkileşime girdiği kitaplarla (raf, yorum,
