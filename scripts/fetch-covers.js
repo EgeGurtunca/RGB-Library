@@ -18,6 +18,7 @@ async function searchCoverId(fields) {
   return hit ? hit.cover_i : null;
 }
 
+
 (async () => {
   const books = db.prepare(
     `SELECT id, title, title_en, author FROM books WHERE cover_url IS NULL OR cover_url = ''`
